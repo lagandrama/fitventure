@@ -10,54 +10,37 @@ export default function Challenges() {
   const [meta, setMeta] = useState({ total: 0, pages: 1 });
 
   const load = async (p = 1) => {
-  try {
-    const params = { page: p, limit: 6 };
-    if (q && q.trim()) params.q = q.trim();
-    if (type && type.trim()) params.type = type.trim();
+    try {
+      const params = { page: p, limit: 6 };
+      if (q && q.trim()) params.q = q.trim();
+      if (type && type.trim()) params.type = type.trim();
 
-    const res = await API.get('/challenges', { params });
-    setItems(res.data.items);
-    setMeta({ total: res.data.total, pages: res.data.pages });
-    setPage(res.data.page);
-  } catch (e) {
-    console.error('Load challenges failed:', e?.response?.data || e.message);
-    alert(e?.response?.data?.error || 'Failed to load challenges');
-  }
-};
-
+      const res = await API.get('/challenges', { params });
+      setItems(res.data.items);
+      setMeta({ total: res.data.total, pages: res.data.pages });
+      setPage(res.data.page);
+    } catch (e) {
+      console.error('Load challenges failed:', e?.response?.data || e.message);
+      alert(e?.response?.data?.error || 'Failed to load challenges');
+    }
+  };
 
   useEffect(() => { load(1); }, []); // initial
 
-    const join = async (id) => {
-    try {
-      const token = localStorage.getItem('token');
-      await API.post(
-        `/challenges/${id}/join`,
-        {}, // body je prazan
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      await load(page);
-    } catch (e) {
-      console.error('Join failed:', e?.response?.data || e.message);
-      alert(e?.response?.data?.error || 'Join failed');
-    }
+  const join = async (id) => {
+    await API.post(`/challenges/${id}/join`);
+    load(page);
   };
 
   const leave = async (id) => {
-    try {
-      const token = localStorage.getItem('token');
-      await API.post(
-        `/challenges/${id}/leave`,
-        {},
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      await load(page);
-    } catch (e) {
-      console.error('Leave failed:', e?.response?.data || e.message);
-      alert(e?.response?.data?.error || 'Leave failed');
-    }
+    await API.post(`/challenges/${id}/leave`);
+    load(page);
   };
 
+  const isJoined = (challenge) => {
+    const userId = localStorage.getItem('userId'); // Spremi userId nakon login-a
+    return challenge.participants?.includes(userId);
+  };
 
   return (
     <div className="space-y-4">
@@ -86,9 +69,24 @@ export default function Challenges() {
               <div>Dates: {new Date(c.startDate).toLocaleDateString()} → {new Date(c.endDate).toLocaleDateString()}</div>
               <div>Status: {c.status}</div>
             </div>
+            {/* Novi blok s gumbom */}
             <div className="mt-3 flex gap-2">
-              <button type="button" onClick={() => join(c._id)} className="bg-blue-500 text-white px-3 py-1">Join</button>
-              <button type="button" onClick={() => leave(c._id)} className="bg-gray-500 text-white px-3 py-1">Leave</button>
+              {isJoined(c) ? (
+                <button
+                  onClick={() => leave(c._id)}
+                  className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700"
+                  title="Click to leave"
+                >
+                  Joined
+                </button>
+              ) : (
+                <button
+                  onClick={() => join(c._id)}
+                  className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700"
+                >
+                  Join
+                </button>
+              )}
             </div>
           </div>
         ))}

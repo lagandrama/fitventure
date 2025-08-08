@@ -31,20 +31,28 @@ router.get('/challenges', /* auth, */ listRules, validate, async (req, res) => {
     const { q, type, mine, page = 1, limit = 10 } = req.query;
     const filter = {};
     if (type) filter.type = type;
-    // mine ima smisla samo kad je user u auth-u; ako nema auth-a, ignoriramo ga
     if ((mine === '1' || mine === 'true') && req.user?._id) filter.creator = req.user._id;
     if (q) filter.$text = { $search: q };
     filter.privacy = 'public'; // javno listanje prikazuje samo public
 
     const skip = (Number(page) - 1) * Number(limit);
-    const [items, total] = await Promise.all([
+
+    const [itemsRaw, total] = await Promise.all([
       Challenge.find(filter)
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(Number(limit))
-        .select('-__v'),
+        // uključimo polja koja trebamo – obavezno 'participants'
+        .select('title type privacy startDate endDate status participants')
+        .lean(),
       Challenge.countDocuments(filter)
     ]);
+
+    // pretvorimo ObjectId -> string da FE može raditi includes(userId)
+    const items = itemsRaw.map(i => ({
+      ...i,
+      participants: (i.participants || []).map(id => id.toString())
+    }));
 
     res.json({ items, total, page: Number(page), pages: Math.ceil(total / Number(limit)) });
   } catch (e) {
@@ -54,11 +62,19 @@ router.get('/challenges', /* auth, */ listRules, validate, async (req, res) => {
 
 // DETAIL (public)
 router.get('/challenges/:id', /* auth, */ idRule, validate, async (req, res) => {
-  const item = await Challenge.findById(req.params.id)
+  const itemRaw = await Challenge.findById(req.params.id)
+    .select('title type privacy startDate endDate status rules participants creator') // ✅ bez -__v
     .populate('creator', 'name email')
-    .select('-__v');
-  if (!item) return res.status(404).json({ error: 'Not found' });
-  if (item.privacy === 'private') return res.status(403).json({ error: 'Forbidden' });
+    .lean();
+
+  if (!itemRaw) return res.status(404).json({ error: 'Not found' });
+  if (itemRaw.privacy === 'private') return res.status(403).json({ error: 'Forbidden' });
+
+  const item = {
+    ...itemRaw,
+    participants: (itemRaw.participants || []).map(id => id.toString())
+  };
+
   res.json(item);
 });
 
@@ -88,14 +104,18 @@ router.post('/challenges/:id/join', auth, idRule, validate, async (req, res) => 
   try {
     const updated = await Challenge.findByIdAndUpdate(
       req.params.id,
-      { $addToSet: { participants: req.user._id } }, // sprječava duplikate
+      { $addToSet: { participants: req.user._id } },
       { new: true }
-    ).select('_id participants privacy');
+    ).select('_id participants privacy').lean();
 
     if (!updated) return res.status(404).json({ error: 'Not found' });
     if (updated.privacy === 'private') return res.status(403).json({ error: 'Forbidden' });
 
-    return res.json({ joined: true, participants: updated.participants.length });
+    return res.json({
+      joined: true,
+      participantsCount: (updated.participants || []).length,
+      participants: (updated.participants || []).map(id => id.toString())
+    });
   } catch (e) {
     return res.status(500).json({ error: 'Join failed' });
   }
@@ -108,11 +128,15 @@ router.post('/challenges/:id/leave', auth, idRule, validate, async (req, res) =>
       req.params.id,
       { $pull: { participants: req.user._id } },
       { new: true }
-    ).select('_id participants');
+    ).select('_id participants').lean();
 
     if (!updated) return res.status(404).json({ error: 'Not found' });
 
-    return res.json({ joined: false, participants: updated.participants.length });
+    return res.json({
+      joined: false,
+      participantsCount: (updated.participants || []).length,
+      participants: (updated.participants || []).map(id => id.toString())
+    });
   } catch (e) {
     return res.status(500).json({ error: 'Leave failed' });
   }
