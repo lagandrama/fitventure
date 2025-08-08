@@ -7,6 +7,9 @@ import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import Header from './components/Header';
 import Footer from './components/Footer';
+import ChallengeNew from './pages/ChallengeNew';
+import ChallengeDetail from './pages/ChallengeDetail';
+import RequireAuth from './components/RequireAuth';
 
 function App() {
   return (
@@ -32,6 +35,8 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/challenges/new" element={<RequireAuth><ChallengeNew /></RequireAuth>} />
+          <Route path="/challenges/:id" element={<ChallengeDetail />} />    
         </Routes>
       </div>
 

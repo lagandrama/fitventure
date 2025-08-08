@@ -1,5 +1,6 @@
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/user');
+const challengeRoutes = require('./routes/challenges');
 const mongoose = require('mongoose');
 const express = require('express');
 const cors = require('cors');
@@ -23,5 +24,11 @@ app.get('/', (req, res) => {
   res.send('FitVenture API is running!');
 });
 
+app.use('/api', authRoutes);
+app.use('/api', userRoutes);
+app.use('/api', challengeRoutes);
+
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
+
