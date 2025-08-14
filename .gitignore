@@ -13,3 +13,7 @@ pnpm-debug.log
 
 # IDE
 .vscode/
+
+# local repo snapshots (do not commit)
+repo_files.txt
+repo_snapshot.tsv
