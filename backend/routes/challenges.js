@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
 const softAuth = require('../middleware/softAuth');
-const validate = require('../middleware/validate');
+const { validate } = require('../middleware/validate');
 const Challenge = require('../models/challenge');
 const { createChallengeRules, updateChallengeRules, idRule, listRules } = require('../validators/challengeValidators');
 
@@ -81,28 +81,59 @@ router.get('/challenges', softAuth, listRules, validate, async (req, res) => {
   }
 });
 
-// DETAIL (public)
-router.get('/challenges/:id', softAuth, idRule, validate, async (req, res) => {
-  const itemRaw = await Challenge.findById(req.params.id)
-    .select('title type privacy startDate endDate status rules participants creator')
-    .populate('creator', 'name email')
-    .lean();
+// DETAIL (public, defensive)
+const mongoose = require('mongoose');
 
-  if (!itemRaw) return res.status(404).json({ error: 'Not found' });
-  if (itemRaw.privacy === 'private') return res.status(403).json({ error: 'Forbidden' });
+router.get('/challenges/:id', softAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
 
-  const participants = (itemRaw.participants || []).map(id => id.toString());
-  const joined = req.user ? participants.some(u => u === String(req.user._id)) : false;
+    // 1) Validacija ID-a bez express-validatora (da izbjegnemo 500/422 zbrku)
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(422).json({ error: 'Invalid challenge id' });
+    }
 
-  const item = {
-    ...itemRaw,
-    participants,
-    participantsCount: participants.length,
-    joined
-  };
+    // 2) Dohvati dokument bez populate (sigurno i brzo)
+    const itemRaw = await Challenge.findById(id)
+      .select('_id title type privacy startDate endDate status rules participants creator')
+      .lean();
 
-  res.json(item);
+    if (!itemRaw) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+    if (itemRaw.privacy === 'private') {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    // 3) Defenzivna priprema polja
+    const participantsArr = Array.isArray(itemRaw.participants) ? itemRaw.participants : [];
+    // convert ObjectId -> string
+    const participants = participantsArr.map(x => (x ? String(x) : '')).filter(Boolean);
+
+    const userId = req.user ? String(req.user._id || req.user.id) : null;
+    const joined = userId ? participants.includes(userId) : false;
+
+    // 4) Response shape koji frontend očekuje
+    return res.json({
+      _id: String(itemRaw._id),
+      title: itemRaw.title || '',
+      type: itemRaw.type || '',
+      privacy: itemRaw.privacy || 'public',
+      startDate: itemRaw.startDate,
+      endDate: itemRaw.endDate,
+      status: itemRaw.status || computeStatus(new Date(itemRaw.startDate), new Date(itemRaw.endDate)),
+      rules: itemRaw.rules || '',
+      participants,
+      participantsCount: participants.length,
+      creator: itemRaw.creator ? String(itemRaw.creator) : null,
+      joined
+    });
+  } catch (e) {
+    console.error('DETAIL error:', e);
+    return res.status(500).json({ error: 'Failed to load challenge' });
+  }
 });
+
 
 // PARTICIPANTS (public for public challenges) – returns names
 router.get('/challenges/:id/participants', softAuth, idRule, validate, async (req, res) => {

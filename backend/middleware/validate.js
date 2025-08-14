@@ -2,12 +2,12 @@
 const { validationResult } = require('express-validator');
 
 function validate(req, res, next) {
-  const result = validationResult(req);
-  if (!result.isEmpty()) {
-    const errs = result.array();
-    return res.status(400).json({ error: errs[0].msg, details: errs });
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(422).json({ errors: errors.array() });
   }
   next();
 }
 
+// imenovani export
 module.exports = { validate };

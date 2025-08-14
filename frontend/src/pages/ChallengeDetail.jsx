@@ -1,56 +1,64 @@
 // frontend/src/pages/ChallengeDetail.jsx
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import API from '../api';
 
 export default function ChallengeDetail() {
   const { id } = useParams();
+
   const [challenge, setChallenge] = useState(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState('');
 
+  const parseError = (e) =>
+    e?.response?.data?.error ||
+    e?.response?.data?.errors?.[0]?.msg || // express-validator format
+    e?.message ||
+    'Failed to load challenge';
+
   const load = async () => {
     try {
       setErr('');
-      const { data } = await API.get(`/challenges/${id}`);
+      setLoading(true);
+      const { data } = await API.get(`/challenges/${id}`); // backend vraća direktno objekt
       setChallenge(data);
     } catch (e) {
-      setErr(e?.response?.data?.error || 'Failed to load challenge');
+      setErr(parseError(e));
+      setChallenge(null);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    load();
+    if (id) load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   const handleJoin = async () => {
     try {
       await API.post(`/challenges/${challenge._id}/join`);
-      setChallenge(prev => ({
-        ...prev,
-        joined: true,
-        participantsCount: (prev.participantsCount || 0) + 1
-      }));
+      await load(); // povuci svježe stanje sa servera (joined, participantsCount...)
     } catch (e) {
-      alert(e?.response?.data?.error || 'Join failed');
+      alert(parseError(e));
     }
   };
 
   const handleLeave = async () => {
     try {
       await API.post(`/challenges/${challenge._id}/leave`);
-      setChallenge(prev => ({
-        ...prev,
-        joined: false,
-        participantsCount: Math.max((prev.participantsCount || 1) - 1, 0)
-      }));
+      await load();
     } catch (e) {
-      alert(e?.response?.data?.error || 'Leave failed');
+      alert(parseError(e));
     }
   };
+
+  const status = useMemo(() => {
+    if (!challenge) return '';
+    // koristi status sa servera ako postoji; fallback na lokalni izračun
+    if (challenge.status) return prettyStatus(challenge.status);
+    return statusFromDates(challenge.startDate, challenge.endDate);
+  }, [challenge]);
 
   if (loading) return <div className="p-4">Loading…</div>;
   if (err) return <div className="p-4 text-red-600">{err}</div>;
@@ -74,7 +82,7 @@ export default function ChallengeDetail() {
         <div>
           <b>Status:</b>{' '}
           <span className="inline-block px-2 py-0.5 text-xs rounded-full bg-green-100">
-            {statusFromDates(startDate, endDate)}
+            {status}
           </span>
         </div>
         <div><b>Privacy:</b> {privacy}</div>
@@ -82,9 +90,7 @@ export default function ChallengeDetail() {
           <b>Dates:</b>{' '}
           {formatDate(startDate)} → {formatDate(endDate)}
         </div>
-        <div>
-          <b>Participants:</b> {participantsCount}
-        </div>
+        <div><b>Participants:</b> {participantsCount}</div>
       </div>
 
       <div className="mt-4 p-3 bg-gray-50 rounded border">
@@ -117,14 +123,20 @@ export default function ChallengeDetail() {
 // Utils
 function formatDate(d) {
   const dt = new Date(d);
-  return dt.toLocaleDateString();
+  return isNaN(dt.getTime()) ? '—' : dt.toLocaleDateString();
 }
 
 function statusFromDates(start, end) {
   const now = new Date();
   const s = new Date(start);
   const e = new Date(end);
+  if (isNaN(s) || isNaN(e)) return 'Active';
   if (now < s) return 'Upcoming';
   if (now > e) return 'Ended';
   return 'Active';
+}
+
+function prettyStatus(s) {
+  const map = { active: 'Active', upcoming: 'Upcoming', ended: 'Ended', inactive: 'Ended' };
+  return map[s] || s;
 }
