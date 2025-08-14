@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
+const softAuth = require('../middleware/softAuth');
 const validate = require('../middleware/validate');
 const Challenge = require('../models/challenge');
 const { createChallengeRules, updateChallengeRules, idRule, listRules } = require('../validators/challengeValidators');
@@ -80,20 +81,24 @@ router.get('/challenges', softAuth, listRules, validate, async (req, res) => {
   }
 });
 
-
 // DETAIL (public)
-router.get('/challenges/:id', /* auth, */ idRule, validate, async (req, res) => {
+router.get('/challenges/:id', softAuth, idRule, validate, async (req, res) => {
   const itemRaw = await Challenge.findById(req.params.id)
-    .select('title type privacy startDate endDate status rules participants creator') // ✅ bez -__v
+    .select('title type privacy startDate endDate status rules participants creator')
     .populate('creator', 'name email')
     .lean();
 
   if (!itemRaw) return res.status(404).json({ error: 'Not found' });
   if (itemRaw.privacy === 'private') return res.status(403).json({ error: 'Forbidden' });
 
+  const participants = (itemRaw.participants || []).map(id => id.toString());
+  const joined = req.user ? participants.some(u => u === String(req.user._id)) : false;
+
   const item = {
     ...itemRaw,
-    participants: (itemRaw.participants || []).map(id => id.toString())
+    participants,
+    participantsCount: participants.length,
+    joined
   };
 
   res.json(item);
