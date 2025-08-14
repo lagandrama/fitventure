@@ -1,4 +1,5 @@
 const authRoutes = require('./routes/auth');
+const stravaRoutes = require('./routes/strava');
 const userRoutes = require('./routes/user');
 const challengeRoutes = require('./routes/challenges');
 const mongoose = require('mongoose');
@@ -25,6 +26,7 @@ app.get('/', (req, res) => {
 });
 
 app.use('/api', authRoutes);
+app.use('/api', stravaRoutes);
 app.use('/api', userRoutes);
 app.use('/api', challengeRoutes);
 
