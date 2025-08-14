@@ -156,7 +156,4 @@ This project is licensed under the **MIT License** — you are free to use, modi
 
 ## Contact
 
-For integration requests, partnership inquiries, or Strava production API access review, please contact:
-
-Sre  
-📧 susacsrecko@gmail.com  
+susacsrecko@gmail.com  
