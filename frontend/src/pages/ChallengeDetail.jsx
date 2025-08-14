@@ -1,7 +1,7 @@
-// frontend/src/pages/ChallengeDetail.jsx
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import API from '../api';
+import Leaderboard from '../components/Leaderboard'; // ⬅️ DODANO
 
 export default function ChallengeDetail() {
   const { id } = useParams();
@@ -20,7 +20,7 @@ export default function ChallengeDetail() {
     try {
       setErr('');
       setLoading(true);
-      const { data } = await API.get(`/challenges/${id}`); // backend vraća direktno objekt
+      const { data } = await API.get(`/challenges/${id}`);
       setChallenge(data);
     } catch (e) {
       setErr(parseError(e));
@@ -38,7 +38,7 @@ export default function ChallengeDetail() {
   const handleJoin = async () => {
     try {
       await API.post(`/challenges/${challenge._id}/join`);
-      await load(); // povuci svježe stanje sa servera (joined, participantsCount...)
+      await load();
     } catch (e) {
       alert(parseError(e));
     }
@@ -53,9 +53,18 @@ export default function ChallengeDetail() {
     }
   };
 
+  const handleSyncStrava = async () => {
+    try {
+      await API.post(`/integrations/strava/sync`, {}, { params: { challengeId: challenge._id } });
+      alert('✅ Strava sync complete!');
+      await load(); // ⬅️ osvježi stanje nakon synca
+    } catch (e) {
+      alert(parseError(e));
+    }
+  };
+
   const status = useMemo(() => {
     if (!challenge) return '';
-    // koristi status sa servera ako postoji; fallback na lokalni izračun
     if (challenge.status) return prettyStatus(challenge.status);
     return statusFromDates(challenge.startDate, challenge.endDate);
   }, [challenge]);
@@ -98,15 +107,24 @@ export default function ChallengeDetail() {
         <div className="whitespace-pre-wrap">{rules || 'No rules'}</div>
       </div>
 
-      <div className="mt-4">
+      <div className="mt-4 flex gap-2">
         {joined ? (
-          <button
-            onClick={handleLeave}
-            className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700"
-            title="Click to leave"
-          >
-            Leave
-          </button>
+          <>
+            <button
+              onClick={handleLeave}
+              className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700"
+              title="Click to leave"
+            >
+              Leave
+            </button>
+            <button
+              onClick={handleSyncStrava}
+              className="bg-orange-600 text-white px-3 py-1 rounded hover:bg-orange-700"
+              title="Sync your Strava activities for this challenge"
+            >
+              Sync Strava
+            </button>
+          </>
         ) : (
           <button
             onClick={handleJoin}
@@ -116,6 +134,9 @@ export default function ChallengeDetail() {
           </button>
         )}
       </div>
+
+      {/* ⬇️ Leaderboard prikaz */}
+      <Leaderboard challengeId={challenge._id} />
     </div>
   );
 }

@@ -10,6 +10,7 @@ const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/user');
 const challengeRoutes = require('./routes/challenges');
 const stravaRoutes = require('./routes/strava');
+const stravaIntegrationRoutes = require('./routes/integrations/strava');
 
 const app = express();
 
@@ -35,6 +36,8 @@ app.use('/api', authRoutes);
 app.use('/api', userRoutes);
 app.use('/api', challengeRoutes);
 app.use('/api', stravaRoutes);
+app.use('/api', stravaIntegrationRoutes);
+app.use('/api', require('./routes/leaderboard'));
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
