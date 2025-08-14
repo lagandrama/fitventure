@@ -6,6 +6,8 @@ const User = require('../models/user');
 const { signToken, verifyToken } = require('../utils/jwt');
 const { buildAuthUrl, exchangeCodeForToken, refreshAccessToken, apiGet } = require('../utils/strava');
 const Activity = require('../models/activity');
+const clientURL = process.env.CLIENT_URL || 'http://localhost:5173';
+
 
 // 1) Redirect na Strava OAuth (prima token iz query || headera || cookieja)
 router.get('/strava/connect', async (req, res) => {
@@ -66,7 +68,8 @@ router.get('/strava/callback', async (req, res) => {
 
     await User.findByIdAndUpdate(userId, update, { new: true });
 
-    return res.redirect('http://localhost:5173/integrations?strava=connected');
+    return res.redirect(`${clientURL}/integrations?strava=connected`);
+    //return res.redirect('http://localhost:5173/integrations?strava=connected');
   } catch (e) {
     console.error('Strava callback failed:', e?.response?.data || e.message);
     return res.status(500).send('Strava connection failed');
@@ -137,6 +140,16 @@ router.get('/strava/sync', auth, async (req, res) => {
     res.status(500).json({ error: 'Strava sync failed' });
   }
 });
+
+// TEMP: provjeri koje vrijednosti backend vidi iz .env (obriši u produkciji)
+router.get('/strava/debug/env', (req, res) => {
+  res.json({
+    STRAVA_CLIENT_ID: String(process.env.STRAVA_CLIENT_ID || '').trim(),
+    STRAVA_REDIRECT_URI: String(process.env.STRAVA_REDIRECT_URI || '').trim(),
+    CLIENT_URL: String(process.env.CLIENT_URL || '').trim()
+  });
+});
+
 
 // 5) Disconnect
 router.post('/strava/disconnect', auth, async (req, res) => {

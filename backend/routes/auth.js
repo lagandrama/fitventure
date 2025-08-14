@@ -1,47 +1,44 @@
+// backend/routes/auth.js
 const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcrypt');
-const User = require('../models/user'); // malo slovo
+
+const User = require('../models/user');
 const { signToken } = require('../utils/jwt');
-const validate = require('../middleware/validate');
 const { registerRules, loginRules } = require('../validators/authValidators');
+const { validate } = require('../middleware/validate');
 
-// REGISTER
+// POST /api/register
 router.post('/register', registerRules, validate, async (req, res) => {
-  try {
-    const { name, email, password } = req.body;
+  const { name, email, password } = req.body;
+  const existing = await User.findOne({ email });
+  if (existing) return res.status(400).json({ error: 'Email already in use' });
 
-    const exists = await User.findOne({ email: email.toLowerCase() });
-    if (exists) return res.status(409).json({ error: 'Email je već registriran.' });
+  const hash = await bcrypt.hash(password, 10);
+  const user = await User.create({ name, email, password: hash });
 
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const user = new User({ name, email: email.toLowerCase(), password: hashedPassword });
-    await user.save();
-
-    res.status(201).json({ message: 'Korisnik registriran!' });
-  } catch (err) {
-    res.status(500).json({ error: 'Registracija nije uspjela.' });
-  }
+  const token = signToken({ userId: user._id });
+  res.json({
+    token,
+    user: { _id: user._id, name: user.name, email: user.email, profilePic: user.profilePic || '' }
+  });
 });
 
-// LOGIN
+// POST /api/login
 router.post('/login', loginRules, validate, async (req, res) => {
-  try {
-    const { email, password } = req.body;
+  const { email, password } = req.body;
 
-    const user = await User.findOne({ email: email.toLowerCase() });
-    if (!user) return res.status(401).json({ error: 'Neispravan email ili lozinka.' });
+  const user = await User.findOne({ email });
+  if (!user) return res.status(401).json({ error: 'Invalid credentials' });
 
-    const ok = await bcrypt.compare(password, user.password);
-    if (!ok) return res.status(401).json({ error: 'Neispravan email ili lozinka.' });
+  const ok = await bcrypt.compare(password, user.password);
+  if (!ok) return res.status(401).json({ error: 'Invalid credentials' });
 
-    const token = signToken({ userId: user._id }, '7d');
-    const userSafe = { id: user._id, name: user.name, email: user.email, profilePic: user.profilePic };
-
-    return res.json({ token, user: userSafe });
-  } catch (err) {
-    return res.status(500).json({ error: 'Prijava nije uspjela.' });
-  }
+  const token = signToken({ userId: user._id });
+  res.json({
+    token,
+    user: { _id: user._id, name: user.name, email: user.email, profilePic: user.profilePic || '' }
+  });
 });
 
 module.exports = router;

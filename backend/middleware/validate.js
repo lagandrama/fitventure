@@ -1,9 +1,13 @@
+// backend/middleware/validate.js
 const { validationResult } = require('express-validator');
 
-module.exports = function validate(req, res, next) {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(422).json({ errors: errors.array().map(e => e.msg) });
+function validate(req, res, next) {
+  const result = validationResult(req);
+  if (!result.isEmpty()) {
+    const errs = result.array();
+    return res.status(400).json({ error: errs[0].msg, details: errs });
   }
   next();
-};
+}
+
+module.exports = { validate };

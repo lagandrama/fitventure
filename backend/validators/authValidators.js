@@ -1,12 +1,15 @@
+// backend/validators/authValidators.js
 const { body } = require('express-validator');
 
-exports.registerRules = [
-  body('name').isString().isLength({ min: 2, max: 60 }).withMessage('Ime mora imati 2-60 znakova.'),
-  body('email').isEmail().withMessage('Neispravan email.'),
-  body('password').isLength({ min: 6 }).withMessage('Lozinka minimalno 6 znakova.')
+const registerRules = [
+  body('name').trim().notEmpty().withMessage('Name is required'),
+  body('email').isEmail().withMessage('Valid email is required'),
+  body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 chars')
 ];
 
-exports.loginRules = [
-  body('email').isEmail().withMessage('Neispravan email.'),
-  body('password').isLength({ min: 6 }).withMessage('Lozinka minimalno 6 znakova.')
+const loginRules = [
+  body('email').isEmail().withMessage('Valid email is required'),
+  body('password').notEmpty().withMessage('Password is required')
 ];
+
+module.exports = { registerRules, loginRules };
