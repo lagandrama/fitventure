@@ -1,3 +1,4 @@
+// frontend/src/pages/Challenges.jsx
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import API from '../api';
@@ -33,10 +34,17 @@ export default function Challenges() {
 
   useEffect(() => { load(1); }, []);
 
+  // --- JOIN/LEAVE s optimističkim update-om liste ---
   const join = async (id) => {
     try {
       await API.post(`/challenges/${id}/join`);
-      await load(page);
+      setItems(prev =>
+        prev.map(x =>
+          x._id === id
+            ? { ...x, joined: true, participantsCount: (x.participantsCount || 0) + 1 }
+            : x
+        )
+      );
     } catch (err) {
       console.error(err);
       alert(err.response?.data?.error || "Failed to join challenge");
@@ -46,7 +54,13 @@ export default function Challenges() {
   const leave = async (id) => {
     try {
       await API.post(`/challenges/${id}/leave`);
-      await load(page);
+      setItems(prev =>
+        prev.map(x =>
+          x._id === id
+            ? { ...x, joined: false, participantsCount: Math.max((x.participantsCount || 1) - 1, 0) }
+            : x
+        )
+      );
     } catch (err) {
       console.error(err);
       alert(err.response?.data?.error || "Failed to leave challenge");
@@ -55,7 +69,8 @@ export default function Challenges() {
 
   const isJoined = (challenge) => {
     const userId = localStorage.getItem('userId');
-    return challenge.joined || challenge.participants?.includes(userId);
+    // podržava i backendovo "joined" polje i stariji format s listom ID-eva
+    return !!(challenge.joined || (challenge.participants && challenge.participants.includes(userId)));
   };
 
   const statusBadge = (s) => {
@@ -127,7 +142,7 @@ export default function Challenges() {
                   className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700"
                   title="Click to leave"
                 >
-                  Joined
+                  Leave
                 </button>
               ) : (
                 <button
@@ -162,7 +177,7 @@ export default function Challenges() {
             ) : (
               <ul className="list-disc pl-5 space-y-1">
                 {participants.map(u => (
-                  <li key={u.id}>{u.name || u.email}</li>
+                  <li key={u.id || u._id}>{u.name || u.email}</li>
                 ))}
               </ul>
             )}
