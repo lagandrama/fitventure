@@ -99,6 +99,15 @@ router.get('/challenges/:id', /* auth, */ idRule, validate, async (req, res) => 
   res.json(item);
 });
 
+// PARTICIPANTS (public for public challenges) – returns names
+router.get('/challenges/:id/participants', softAuth, idRule, validate, async (req, res) => {
+  const c = await Challenge.findById(req.params.id).populate('participants', 'name email').select('privacy participants');
+  if (!c) return res.status(404).json({ error: 'Not found' });
+  if (c.privacy === 'private') return res.status(403).json({ error: 'Forbidden' });
+  const users = c.participants.map(u => ({ id: u._id, name: u.name, email: u.email }));
+  res.json({ participants: users, count: users.length });
+});
+
 // UPDATE (samo creator)
 router.patch('/challenges/:id', auth, updateChallengeRules, validate, async (req, res) => {
   const c = await Challenge.findById(req.params.id);
