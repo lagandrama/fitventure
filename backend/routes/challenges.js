@@ -26,39 +26,60 @@ router.post('/challenges', auth, createChallengeRules, validate, async (req, res
 });
 
 // LIST (paginacija + filtri: q, type, mine)
-router.get('/challenges', /* auth, */ listRules, validate, async (req, res) => {
+router.get('/challenges', softAuth, listRules, validate, async (req, res) => {
   try {
-    const { q, type, mine, page = 1, limit = 10 } = req.query;
+    const { q, type, mine, status, showInactive, page = 1, limit = 10 } = req.query;
     const filter = {};
     if (type) filter.type = type;
     if ((mine === '1' || mine === 'true') && req.user?._id) filter.creator = req.user._id;
     if (q) filter.$text = { $search: q };
-    filter.privacy = 'public'; // javno listanje prikazuje samo public
+    filter.privacy = 'public';
+
+    // Default: prikazujemo ACTIVE i UPCOMING; INACTIVE skrivamo osim ako status=inactive
+    const now = new Date();
+    const includeInactiveLegacy = showInactive === '1' || showInactive === 'true'; // BC
+    if (status === 'active') {
+      filter.startDate = { $lte: now };
+      filter.endDate = { $gte: now };
+    } else if (status === 'upcoming') {
+      filter.startDate = { $gt: now };
+    } else if (status === 'inactive') {
+      filter.endDate = { $lt: now };
+    } else if (!includeInactiveLegacy) {
+      // No status filter given → default exclude inactive
+      filter.endDate = { $gte: now };
+    }
 
     const skip = (Number(page) - 1) * Number(limit);
+    const items = await Challenge.find(filter)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(Number(limit))
+      .select('_id title type privacy startDate endDate creator participants');
 
-    const [itemsRaw, total] = await Promise.all([
-      Challenge.find(filter)
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(Number(limit))
-        // uključimo polja koja trebamo – obavezno 'participants'
-        .select('title type privacy startDate endDate status participants')
-        .lean(),
-      Challenge.countDocuments(filter)
-    ]);
+    const mapped = items.map(c => {
+      const status = computeStatus(c.startDate, c.endDate); // uses inactive after endDate
+      const joined = req.user ? c.participants.some(u => String(u) === String(req.user._id)) : false;
+      return {
+        _id: c._id,
+        title: c.title,
+        type: c.type,
+        privacy: c.privacy,
+        startDate: c.startDate,
+        endDate: c.endDate,
+        status,
+        participantsCount: c.participants.length,
+        joined
+      };
+    });
 
-    // pretvorimo ObjectId -> string da FE može raditi includes(userId)
-    const items = itemsRaw.map(i => ({
-      ...i,
-      participants: (i.participants || []).map(id => id.toString())
-    }));
-
-    res.json({ items, total, page: Number(page), pages: Math.ceil(total / Number(limit)) });
+    const total = await Challenge.countDocuments(filter);
+    res.json({ items: mapped, total, page: Number(page), pages: Math.ceil(total / Number(limit)) });
   } catch (e) {
     res.status(500).json({ error: 'Failed to list challenges' });
   }
 });
+
 
 // DETAIL (public)
 router.get('/challenges/:id', /* auth, */ idRule, validate, async (req, res) => {
