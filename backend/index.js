@@ -9,7 +9,7 @@ const mongoose = require('mongoose');
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/user');
 const challengeRoutes = require('./routes/challenges');
-const stravaRoutes = require('./routes/strava');
+const stravaRoutes = require('./routes/integrations/strava');
 const stravaIntegrationRoutes = require('./routes/integrations/strava');
 
 const app = express();
