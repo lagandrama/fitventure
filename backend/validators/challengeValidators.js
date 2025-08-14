@@ -29,6 +29,10 @@ exports.listRules = [
   query('q').optional({ checkFalsy: true }).isString(),
   query('type').optional({ checkFalsy: true }).isIn(['running', 'yoga', 'hiit', 'steps', 'weightloss', 'custom']),
   query('mine').optional({ checkFalsy: true }).isIn(['1','true','0','false']),
+  // New: status filter
+  query('status').optional({ checkFalsy: true }).isIn(['active','upcoming','inactive']),
+  // Backward-compat (ako si ranije imao showInactive)
+  query('showInactive').optional({ checkFalsy: true }).isIn(['1','true','0','false']),
   query('page').optional({ checkFalsy: true }).isInt({ min: 1 }),
   query('limit').optional({ checkFalsy: true }).isInt({ min: 1, max: 100 }),
 ];
